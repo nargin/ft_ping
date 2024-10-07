@@ -1,52 +1,29 @@
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <string.h>
-#include <stdio.h>
-
-typedef unsigned char bool;
-#define PACKET_SIZE 1024
-
-struct flags {
-	bool v;
-	bool h;
-	bool c;
-	bool q;
-	bool i;
-	bool n;
-	bool l;
-};
-
-struct icmp_header {
-	uint8_t type;
-	uint8_t code;
-	uint16_t checksum;
-	uint16_t id;
-	uint16_t sequence;
-};
+#include "header.h"
 
 int	arguments_parser(int ac, char av[]) {
 	return 1;
 }
 
-void checksum(void *buf, int len) {
-	unsigned short *buffer = buf;
-	unsigned int sum = 0;
-	unsigned short result;
+uint16_t calculate_checksum(uint16_t *addr, int len) {
+	int nleft = len;
+	int sum = 0;
+	uint16_t *w = addr;
+	uint16_t answer = 0;
 
-	for (sum = 0; len > 1; len -= 2) {
-		sum += *buffer++;
+	while (nleft > 1)  {
+		sum += *w++;
+		nleft -= 2;
 	}
 
-	if (len == 1) {
-		sum += *(unsigned char *)buffer;
+	if (nleft == 1) {
+		*(unsigned char *)(&answer) = *(unsigned char *)w;
+		sum += answer;
 	}
 
-	sum = (sum >> 16) + (sum & 0xFFFF);
+	sum = (sum >> 16) + (sum & 0xffff);
 	sum += (sum >> 16);
-	result = ~sum;
-	printf("Checksum: %d\n", result);
+	answer = ~sum;
+	return answer;
 }
 
 int main(int ac, char *av[]) {
@@ -54,48 +31,63 @@ int main(int ac, char *av[]) {
 		fprintf(stderr, "You must be root to run this program.\n");
 		return 1;
 	}
-
-	struct flags flags = {0};
 	
-	if (arguments_parser(ac, *av) == 0) {
-		return 0;
-	}
-
-	
-	printf("ICMP sniffa: %d\n", IPPROTO_ICMP);
-	int sd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+	int sd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP); // AF_INET = IPv4, SOCK_RAW = raw socket, IPPROTO_ICMP = ICMP
 	if (sd < 0) {
 		perror("socket");
 		return 1;
 	}
-	printf("Socket au top !\n");
+	// printf("ICMP sniffa: %d\n", sd);
+
 	char buf[PACKET_SIZE];
 	memset(buf, 0, PACKET_SIZE);
 
-	if (setsockopt(sd, IPPROTO_IP, IP_HDRINCL, &(int){1}, sizeof(int)) < 0) {
-		perror("setsockopt");
-		return 1;
-	}
-	printf("Option pour le socket au top !\n");
+	struct icmphdr icmp;
+	memset(&icmp, 0, sizeof(icmp));
+	icmp.type = ICMP_ECHO;
+	icmp.un.echo.sequence = 1; // 16 bits
+	icmp.un.echo.id = getpid() & 0xFFFF; // 16 bits
+	icmp.checksum = calculate_checksum((uint16_t *)&icmp, sizeof(icmp));
 
-	struct icmp_header *icmp = (struct icmp_header *)buf;
-	icmp->type = 8;
-	icmp->code = 0;
-	icmp->checksum = 0;
-	icmp->id = getpid() & 0xFFFF; // 16 bits
-	icmp->sequence = 1;
-
-	checksum(buf, PACKET_SIZE);
+	// printf("Checksum: %d\n", icmp.checksum);
 
 	struct sockaddr_in dest_addr;
+	memset(&dest_addr, 0, sizeof(dest_addr));
 	dest_addr.sin_family = AF_INET;
-	dest_addr.sin_port = 0;
 	dest_addr.sin_addr.s_addr = inet_addr("8.8.8.8");
 
-	if (sendto(sd, buf, PACKET_SIZE, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) {
+	memcpy(buf, &icmp, sizeof(icmp));
+
+	struct timeval start, end;
+	gettimeofday(&start, NULL);
+	
+	if (sendto(sd, buf, sizeof(icmp), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) {
 		perror("sendto");
 		return 1;
 	}
+	// printf("Paquet envoyé !\n");
+
+	struct in_addr src_addr;
+	socklen_t addr_len = sizeof(src_addr);
+	if (recvfrom(sd, buf, PACKET_SIZE, 0, (struct sockaddr *)&src_addr, &addr_len) < 0) {
+		perror("recv");
+		return 1;
+	}
+
+	gettimeofday(&end, NULL);
+	long rtt = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+
+	struct iphdr *ip = (struct iphdr *)buf;
+	struct icmphdr *icmp_resp = (struct icmphdr *)(buf + (ip->ihl * 4));
+
+	printf("%d bytes: ", addr_len);
+	printf("icmp_seq=%d ", icmp_resp->un.echo.sequence);
+	// printf("IP source: %s\t", inet_ntoa(src_addr));
+	// printf("ICMP type: %d\n", ((struct icmphdr *)buf)->type);
+	printf("ttl= %d ", ip->ttl);
+	printf("time=%ld ms\n", rtt);
+	
+	// printf("Paquet reçu !\n");
 
 	close(sd);
 	printf("Adieu monde ! >:)\n");
