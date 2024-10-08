@@ -1,6 +1,8 @@
 #include "header.h"
 
 int	arguments_parser(int ac, char av[]) {
+	(void)ac;
+	(void)av;
 	return 1;
 }
 
@@ -29,6 +31,11 @@ uint16_t calculate_checksum(uint16_t *addr, int len) {
 int main(int ac, char *av[]) {
 	if (getuid() != 0) {
 		fprintf(stderr, "You must be root to run this program.\n");
+		return 1;
+	}
+
+	if (arguments_parser(ac, av[0]) == 0) {
+		fprintf(stderr, "Usage: %s\n", av[0]);
 		return 1;
 	}
 	
@@ -90,7 +97,7 @@ int main(int ac, char *av[]) {
 	// printf("Paquet reçu !\n");
 
 	close(sd);
-	printf("Adieu monde ! >:)\n");
+	printf("Goodbye world! >:)\n");
 
 	return 0;
 }
