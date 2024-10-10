@@ -1,9 +1,58 @@
 #include "header.h"
 
-int	arguments_parser(int ac, char av[]) {
-	(void)ac;
-	(void)av;
-	return 1;
+void print_help(const char *program_name) {
+	printf("Usage: %s [OPTIONS] destination\n", program_name);
+	printf("Options:\n");
+	printf("  -v            Verbose output\n");
+	printf("  -h            Display this help message and exit\n");
+	printf("  -c count      Stop after sending (and receiving) count ECHO_REQUEST packets\n");
+	printf("  -q            Quiet output\n");
+	printf("  -i interval   Wait interval seconds between sending each packet\n");
+	printf("  -n            Numeric output only, no name resolution\n");
+	printf("  -l            Preload (send) count packets before starting normal ping\n");
+}
+
+void print_flags(struct flags *flags) {
+    printf("Flags:\n");
+    printf("  Verbose: %s\n", flags->v ? "true" : "false");
+    printf("  Count: %i\n", flags->count);
+    printf("  Quiet: %s\n", flags->q ? "true" : "false");
+    printf("  Interval: %f\n", flags->interval);
+    printf("  Numeric: %s\n", flags->n ? "true" : "false");
+    printf("  Preload: %s\n", flags->l ? "true" : "false");
+}
+
+void	arguments_parser(int ac, char *av[], struct flags *flags) {
+	if (ac == 1) {
+		print_help(*av);
+		return;
+	}
+
+	int c;
+	while ((c = getopt(ac, av, "vhc:i:qnl")) != -1) {
+		switch (c) {
+			case 'v':
+				flags->v = true;
+				break;
+			case 'h':
+				print_help(*av);
+				break;
+			case 'c':
+				flags->count = atoi(optarg);
+				break;
+			case 'q':
+				flags->q = true;
+				break;
+			case 'n':
+				flags->n = true;
+				break;
+			case 'l':
+				flags->l = true;
+				break;
+			default:
+				abort();
+		}
+	}
 }
 
 uint16_t calculate_checksum(uint16_t *addr, int len) {
@@ -34,10 +83,9 @@ int main(int ac, char *av[]) {
 		return 1;
 	}
 
-	if (arguments_parser(ac, av[0]) == 0) {
-		fprintf(stderr, "Usage: %s\n", av[0]);
-		return 1;
-	}
+	struct flags options = {1, 1, false, false, false, false};
+	arguments_parser(ac, av, &options);
+	print_flags(&options);
 	
 	int sd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP); // AF_INET = IPv4, SOCK_RAW = raw socket, IPPROTO_ICMP = ICMP
 	if (sd < 0) {
@@ -45,9 +93,6 @@ int main(int ac, char *av[]) {
 		return 1;
 	}
 	// printf("ICMP sniffa: %d\n", sd);
-
-	char buf[PACKET_SIZE];
-	memset(buf, 0, PACKET_SIZE);
 
 	struct icmphdr icmp;
 	memset(&icmp, 0, sizeof(icmp));
@@ -58,41 +103,9 @@ int main(int ac, char *av[]) {
 
 	// printf("Checksum: %d\n", icmp.checksum);
 
-	struct sockaddr_in dest_addr;
-	memset(&dest_addr, 0, sizeof(dest_addr));
-	dest_addr.sin_family = AF_INET;
-	dest_addr.sin_addr.s_addr = inet_addr("8.8.8.8");
-
-	memcpy(buf, &icmp, sizeof(icmp));
-
-	struct timeval start, end;
-	gettimeofday(&start, NULL);
-	
-	if (sendto(sd, buf, sizeof(icmp), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) {
-		perror("sendto");
-		return 1;
+	while (options.count--) {
+		send_packets(sd, icmp, "8.8.8.8");
 	}
-	// printf("Paquet envoyé !\n");
-
-	struct in_addr src_addr;
-	socklen_t addr_len = sizeof(src_addr);
-	if (recvfrom(sd, buf, PACKET_SIZE, 0, (struct sockaddr *)&src_addr, &addr_len) < 0) {
-		perror("recv");
-		return 1;
-	}
-
-	gettimeofday(&end, NULL);
-	long rtt = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
-
-	struct iphdr *ip = (struct iphdr *)buf;
-	struct icmphdr *icmp_resp = (struct icmphdr *)(buf + (ip->ihl * 4));
-
-	printf("%d bytes: ", addr_len);
-	printf("icmp_seq=%d ", icmp_resp->un.echo.sequence);
-	// printf("IP source: %s\t", inet_ntoa(src_addr));
-	// printf("ICMP type: %d\n", ((struct icmphdr *)buf)->type);
-	printf("ttl= %d ", ip->ttl);
-	printf("time=%ld ms\n", rtt);
 	
 	// printf("Paquet reçu !\n");
 

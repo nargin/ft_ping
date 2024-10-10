@@ -5,7 +5,7 @@ NAME = ft_ping
 CC = gcc
 CFLAGS = -Wall -Wextra -Werror
 
-SRCS = main.c
+SRCS = main.c packet.c
 OBJS = $(SRCS:.c=.o)
 
 all: $(NAME) animate

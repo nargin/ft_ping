@@ -12,18 +12,20 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <stdbool.h>
 
-typedef unsigned char bool;
+// typedef unsigned char bool;
 #define PACKET_SIZE 64
 
 struct flags {
+	int	count;
+	double	interval;
 	bool v;
-	bool h;
-	bool c;
 	bool q;
-	bool i;
 	bool n;
 	bool l;
 };
+
+int send_packets(int fd, struct icmphdr icmp, char *address);
 
 #endif
