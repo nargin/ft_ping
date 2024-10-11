@@ -61,6 +61,10 @@ void	arguments_parser(int ac, char *av[], struct flags *flags) {
 }
 
 int main(int ac, char *av[]) {
+#if __STDC_VERSION__ < 199901L
+	# error No for loop
+#endif
+
 	if (getuid() != 0) {
 		fprintf(stderr, "You must be root to run this program.\n");
 		return 1;
@@ -95,14 +99,14 @@ int main(int ac, char *av[]) {
 	memset(&icmp, 0, sizeof(icmp));
 	icmp.type = ICMP_ECHO;
 	icmp.un.echo.sequence = 0; // 16 bits
-	icmp.un.echo.id = getpid() & 0xFFFF; // 16 bits
+	icmp.un.echo.id = getpid();
 	icmp.checksum = calculate_checksum((uint16_t *)&icmp, sizeof(icmp));
 
 	// printf("Checksum: %d\n", icmp.checksum);
 	// int msg_count = 1;
 
-	while (options.count--) {
-		send_packets(sd, icmp, ip_addr, addr_con);
+	for (int i = 0; i < options.count; i++) {
+		send_ping(sd, icmp, ip_addr, addr_con);
 		icmp.un.echo.sequence++;
 	}
 	

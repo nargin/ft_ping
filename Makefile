@@ -3,9 +3,9 @@ MAKEFLAGS += --no-print-directory
 NAME = ft_ping
 
 CC = gcc
-CFLAGS = -Wall -Wextra -Werror
+CFLAGS = -Wall -Wextra -Werror #-std=gnu90
 
-SRCS = main.c packet.c
+SRCS = main.c ping.c
 OBJS = $(SRCS:.c=.o)
 
 all: $(NAME) animate

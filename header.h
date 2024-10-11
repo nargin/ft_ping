@@ -15,21 +15,20 @@
 #include <unistd.h>
 #include <stdbool.h>
 
-// typedef unsigned char bool;
 #define PACKET_SIZE 64
 
 struct flags {
 	int	count;
 	double	interval;
-	bool v;
-	bool q;
-	bool n;
-	bool l;
+	_Bool v;
+	_Bool q;
+	_Bool n;
+	_Bool l;
 };
 
 extern struct flags options;
 
-int send_packets(int sd, struct icmphdr icmp, char *address, struct sockaddr_in dest_addr);
+int send_ping(int sd, struct icmphdr icmp, char *address, struct sockaddr_in dest_addr);
 uint16_t calculate_checksum(uint16_t *addr, int len);
 char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con);
 
