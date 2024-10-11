@@ -1,4 +1,9 @@
+// source: https://www.geeksforgeeks.org/ping-in-c/
+
 #include "header.h"
+
+// default: count = 3, interval = 1s, verbose|quiet|numeric|preload = false
+struct flags options = {3, 1, false, false, false, false};
 
 void print_help(const char *program_name) {
 	printf("Usage: %s [OPTIONS] destination\n", program_name);
@@ -55,62 +60,54 @@ void	arguments_parser(int ac, char *av[], struct flags *flags) {
 	}
 }
 
-uint16_t calculate_checksum(uint16_t *addr, int len) {
-	int nleft = len;
-	int sum = 0;
-	uint16_t *w = addr;
-	uint16_t answer = 0;
-
-	while (nleft > 1)  {
-		sum += *w++;
-		nleft -= 2;
-	}
-
-	if (nleft == 1) {
-		*(unsigned char *)(&answer) = *(unsigned char *)w;
-		sum += answer;
-	}
-
-	sum = (sum >> 16) + (sum & 0xffff);
-	sum += (sum >> 16);
-	answer = ~sum;
-	return answer;
-}
-
 int main(int ac, char *av[]) {
 	if (getuid() != 0) {
 		fprintf(stderr, "You must be root to run this program.\n");
 		return 1;
 	}
 
-	struct flags options = {1, 1, false, false, false, false};
 	arguments_parser(ac, av, &options);
-	print_flags(&options);
+	// print_flags(&options);
 	
 	int sd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP); // AF_INET = IPv4, SOCK_RAW = raw socket, IPPROTO_ICMP = ICMP
 	if (sd < 0) {
 		perror("socket");
 		return 1;
 	}
-	// printf("ICMP sniffa: %d\n", sd);
+
+	int ttl_val = 64;
+	if (setsockopt(sd, SOL_IP, IP_TTL, &ttl_val, sizeof(ttl_val)) != 0) {
+		printf("\nSetting socket options to TTL failed!\n");
+        return 1;
+    } else {
+        printf("\nSocket set to TTL...\n");
+    }
+
+	struct sockaddr_in addr_con;
+	char *ip_addr = dns_lookup(av[1], &addr_con);
+	if (ip_addr == NULL) {
+		printf("DNS lookup failed! Could not resolve hostname!\n");
+	} else {
+		printf("Trying to connect to '%s', IP: '%s'\n", av[1], ip_addr);
+	}
 
 	struct icmphdr icmp;
 	memset(&icmp, 0, sizeof(icmp));
 	icmp.type = ICMP_ECHO;
-	icmp.un.echo.sequence = 1; // 16 bits
+	icmp.un.echo.sequence = 0; // 16 bits
 	icmp.un.echo.id = getpid() & 0xFFFF; // 16 bits
 	icmp.checksum = calculate_checksum((uint16_t *)&icmp, sizeof(icmp));
 
 	// printf("Checksum: %d\n", icmp.checksum);
+	// int msg_count = 1;
 
 	while (options.count--) {
-		send_packets(sd, icmp, "8.8.8.8");
+		send_packets(sd, icmp, ip_addr, addr_con);
+		icmp.un.echo.sequence++;
 	}
 	
-	// printf("Paquet reçu !\n");
-
 	close(sd);
-	printf("Goodbye world! >:)\n");
+	free(ip_addr);
 
 	return 0;
 }
