@@ -61,18 +61,24 @@ int main(int ac, char *av[]) {
 	if (setsockopt(sockfd, SOL_IP, IP_TTL, &ttl_val, sizeof(ttl_val)) != 0) {
 		printf("\nSetting socket options to TTL failed!\n");
         return 1;
-    } else {
+    } else if (options.v) {
         printf("\nSocket set to TTL...\n");
     }
 
 	struct sockaddr_in addr_con;
-	char *ip_addr = dns_lookup(av[1], &addr_con);
-	if (ip_addr == NULL) {
+	char *ip_addr = dns_lookup(av[ac - 1], &addr_con);
+	if (ip_addr == NULL && options.v) {
 		printf("DNS lookup failed! Could not resolve hostname!\n");
-	} else {
-		printf("Trying to connect to '%s', IP: '%s'\n", av[1], ip_addr);
+	} else if (options.v) {
+		printf("Trying to connect to '%s', IP: '%s'\n", av[ac - 1], ip_addr);
 	}
 
+	if (!ip_addr) {
+		printf("%s: %s: name or service not known\n", *av, av[ac - 1]);
+		return 1;
+	}
+
+	printf("PING %s (%s)\n", av[ac - 1], ip_addr);
 	send_ping(sockfd, ip_addr, addr_con);
 	
 	close(sockfd);

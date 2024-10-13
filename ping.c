@@ -3,15 +3,13 @@
 extern struct flags options;
 
 char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con) {
-	// struct hostent *host_entity;
-	struct addrinfo *res, hints;
+	struct addrinfo *res;
 	char *ip = malloc(INET_ADDRSTRLEN * sizeof(char)); // 4 * 3(1-9) + 3(.) + '\0'
 
-	hints.ai_family = AF_INET;
-	(void)hints;
+	if (options.v) {
+		printf("Resolving domain name system...\n");
+	}
 
-	printf("Resolving domain name system...\n");
-	
 	if (getaddrinfo(addr_host, NULL, NULL, &res) != 0) {
 		return NULL;
 	}
@@ -22,6 +20,8 @@ char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con) {
 
 	return ip;
 }
+
+
 
 uint16_t calculate_checksum(uint16_t *addr, int len) {
 	int nleft = len;
@@ -46,14 +46,15 @@ uint16_t calculate_checksum(uint16_t *addr, int len) {
 }
 
 int send_ping(int sockfd, char *address, struct sockaddr_in dest_addr) {
-    char send_buf[PACKET_SIZE];
-    char recv_buf[PACKET_SIZE];
+    char send_buf[PACKET_SIZE], recv_buf[PACKET_SIZE];
     struct timeval tv_out;
     tv_out.tv_sec = 1;
     tv_out.tv_usec = 0;
 
     dest_addr.sin_family = AF_INET;
-    dest_addr.sin_addr.s_addr = inet_addr(address);
+    // dest_addr.sin_addr.s_addr = inet_addr(address);
+	inet_aton(address, &dest_addr.sin_addr);
+	if (!address) printf("hihi\n");
 
     struct icmphdr icmp_sender;
     memset(&icmp_sender, 0, sizeof(icmp_sender));
@@ -68,7 +69,7 @@ int send_ping(int sockfd, char *address, struct sockaddr_in dest_addr) {
 	gettimeofday(&during, NULL);
 
     while (options.count--) {
-        icmp_sender.un.echo.sequence++;
+        icmp_sender.un.echo.sequence = htons(msg_count + 1); // convert to network number???
         icmp_sender.checksum = 0;
         icmp_sender.checksum = calculate_checksum((uint16_t *)&icmp_sender, sizeof(icmp_sender));
         memcpy(send_buf, &icmp_sender, sizeof(icmp_sender));
@@ -111,7 +112,7 @@ int send_ping(int sockfd, char *address, struct sockaddr_in dest_addr) {
 		if (!options.n) {
 			printf("\t");
 			printf("%zd bytes received: ", bytes_received);
-			printf("icmp_seq=%d ", icmp_resp->un.echo.sequence);
+			printf("icmp_seq=%d ", ntohs(icmp_resp->un.echo.sequence)); // inverse htons
 			printf("ttl=%d ", ip->ttl);
 			printf("time=%ld ms\n", rtt);
 		}
@@ -128,7 +129,7 @@ int send_ping(int sockfd, char *address, struct sockaddr_in dest_addr) {
 
 	printf("\n==== %s ping statistics ====\n", address);
 	printf(
-		"%d packets sent, %d packets received, %f%% packet loss, time %ldms\n",
+		"%d packets sent, %d packets received, %d%% packet loss, time %ldms\n",
 		msg_count, msg_received_count, (100 - ((msg_received_count / msg_count) * 100)), total_time
 	);
 
