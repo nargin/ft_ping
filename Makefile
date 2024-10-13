@@ -5,7 +5,7 @@ NAME = ft_ping
 CC = gcc
 CFLAGS = -Wall -Wextra -Werror #-std=gnu90
 
-SRCS = main.c ping.c
+SRCS = main.c ping.c utils.c
 OBJS = $(SRCS:.c=.o)
 
 all: $(NAME) animate

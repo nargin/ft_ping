@@ -42,57 +42,95 @@ uint16_t calculate_checksum(uint16_t *addr, int len) {
 	sum = (sum >> 16) + (sum & 0xffff);
 	sum += (sum >> 16);
 	answer = ~sum;
-	printf("Sortie du checker\n");
 	return answer;
 }
 
-int send_ping(int sd, struct icmphdr icmp, char *address, struct sockaddr_in dest_addr) {
-	printf("sequence: %d\n", icmp.un.echo.sequence);
-	
-	char buf[PACKET_SIZE];
-	memset(buf, 0, PACKET_SIZE);
+int send_ping(int sockfd, char *address, struct sockaddr_in dest_addr) {
+    char send_buf[PACKET_SIZE];
+    char recv_buf[PACKET_SIZE];
+    struct timeval tv_out;
+    tv_out.tv_sec = 1;
+    tv_out.tv_usec = 0;
 
-	// struct sockaddr_in dest_addr;
-	// memset(&dest_addr, 0, sizeof(dest_addr));
-	dest_addr.sin_family = AF_INET;
-	dest_addr.sin_addr.s_addr = inet_addr(address);
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_addr.s_addr = inet_addr(address);
 
-	// icmp.checksum = calculate_checksum((uint16_t *)&icmp, sizeof(icmp));
-	memcpy(buf, &icmp, sizeof(icmp));
+    struct icmphdr icmp_sender;
+    memset(&icmp_sender, 0, sizeof(icmp_sender));
+    icmp_sender.type = ICMP_ECHO;
+    icmp_sender.un.echo.sequence = 0;
+    icmp_sender.un.echo.id = getpid();
+    
+	// stats purpose
+	int msg_count = 0;
+	int msg_received_count = 0;
+	struct timeval during, elapsed;
+	gettimeofday(&during, NULL);
 
-	struct timeval start, end;
-	gettimeofday(&start, NULL);
+    while (options.count--) {
+        icmp_sender.un.echo.sequence++;
+        icmp_sender.checksum = 0;
+        icmp_sender.checksum = calculate_checksum((uint16_t *)&icmp_sender, sizeof(icmp_sender));
+        memcpy(send_buf, &icmp_sender, sizeof(icmp_sender));
 
-	if (sendto(sd, buf, sizeof(icmp), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0) {
-		perror("sendto");
-		return 1;
-	}
-	printf("Paquet envoyé !\n");
+        struct timeval start, end;
+        gettimeofday(&start, NULL);
 
-	struct in_addr src_addr;
-	socklen_t addr_len = sizeof(src_addr);
-	memset(&buf, 0, PACKET_SIZE);
-	if (recvfrom(sd, buf, PACKET_SIZE, 0, (struct sockaddr *)&src_addr, &addr_len) < 0) {
-		perror("recv");
-		return 1;
-	}
-	printf("Packet recu !!! :D\n");
+        ssize_t bytes_sent = sendto(sockfd, send_buf, sizeof(icmp_sender), 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+        if (bytes_sent < 0) {
+            perror("sendto");
+            return 1;
+        }
+		msg_count++;
+        if (options.v) printf("Sent %zd bytes\n", bytes_sent);
 
-	gettimeofday(&end, NULL);
-	long rtt = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
+        setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv_out, sizeof tv_out);
 
-	struct iphdr *ip = (struct iphdr *)buf;
-	struct icmphdr *icmp_resp = (struct icmphdr *)(buf + (ip->ihl * 4));
+        struct sockaddr_in src_addr;
+        socklen_t addr_len = sizeof(src_addr);
+        memset(recv_buf, 0, PACKET_SIZE);
+        ssize_t bytes_received = recvfrom(sockfd, recv_buf, sizeof(recv_buf), 0, (struct sockaddr *)&src_addr, &addr_len);
+        if (bytes_received < 0) {
+            if (errno == EWOULDBLOCK) {
+                printf("Request timed out\n");
+            } else {
+                perror("recvfrom");
+            }
+            continue;
+        }
 
-	printf("\t");
-	printf("%d bytes: ", addr_len);
-	printf("icmp_seq=%d ", icmp_resp->un.echo.sequence);
-	// printf("IP source: %s\t", inet_ntoa(src_addr));
-	// printf("ICMP type: %d\n", ((struct icmphdr *)buf)->type);
-	printf("ttl=%d ", ip->ttl);
-	printf("time=%ld ms\n", rtt);
+        gettimeofday(&end, NULL);
+        long rtt = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
 
-	sleep(options.interval);
+        struct iphdr *ip = (struct iphdr *)recv_buf;
+		if (options.v) pr_iph(ip);
+        struct icmphdr *icmp_resp = (struct icmphdr *)(recv_buf + (ip->ihl * 4));
 
-	return 0;
+		msg_received_count++;
+
+		if (!options.n) {
+			printf("\t");
+			printf("%zd bytes received: ", bytes_received);
+			printf("icmp_seq=%d ", icmp_resp->un.echo.sequence);
+			printf("ttl=%d ", ip->ttl);
+			printf("time=%ld ms\n", rtt);
+		}
+
+        if (icmp_resp->un.echo.sequence != icmp_sender.un.echo.sequence) {
+            printf("Warning: Received sequence number does not match sent sequence number\n");
+        }
+
+        sleep(options.interval);
+    }
+
+	gettimeofday(&elapsed, NULL);
+	long total_time = (elapsed.tv_sec - during.tv_sec) * 1000.0 + (elapsed.tv_usec - during.tv_usec) / 1000.0;
+
+	printf("\n==== %s ping statistics ====\n", address);
+	printf(
+		"%d packets sent, %d packets received, %f%% packet loss, time %ldms\n",
+		msg_count, msg_received_count, (100 - ((msg_received_count / msg_count) * 100)), total_time
+	);
+
+    return 0;
 }
