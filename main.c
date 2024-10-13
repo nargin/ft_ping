@@ -48,6 +48,7 @@ int main(int ac, char *av[]) {
 		return 1;
 	}
 
+	char *hostname = av[ac - 1];
 	arguments_parser(ac, av, &options);
 	// print_flags(&options);
 	
@@ -66,19 +67,19 @@ int main(int ac, char *av[]) {
     }
 
 	struct sockaddr_in addr_con;
-	char *ip_addr = dns_lookup(av[ac - 1], &addr_con);
+	char *ip_addr = dns_lookup(hostname, &addr_con);
 	if (ip_addr == NULL && options.v) {
 		printf("DNS lookup failed! Could not resolve hostname!\n");
 	} else if (options.v) {
-		printf("Trying to connect to '%s', IP: '%s'\n", av[ac - 1], ip_addr);
+		printf("Trying to connect to '%s', IP: '%s'\n", hostname, ip_addr);
 	}
 
 	if (!ip_addr) {
-		printf("%s: %s: name or service not known\n", *av, av[ac - 1]);
+		printf("%s: %s: name or service not known\n", *av, hostname);
 		return 1;
 	}
 
-	printf("PING %s (%s)\n", av[ac - 1], ip_addr);
+	printf("PING %s (%s)\n", hostname, ip_addr);
 	send_ping(sockfd, ip_addr, addr_con);
 	
 	close(sockfd);
