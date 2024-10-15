@@ -19,11 +19,11 @@
 
 struct flags {
 	int	count;
+	int	preload;
 	double	interval;
 	_Bool v;
 	_Bool q;
 	_Bool n;
-	_Bool l;
 };
 
 extern struct flags options;

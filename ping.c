@@ -56,10 +56,11 @@ int send_ping(int sockfd, char *address, struct sockaddr_in dest_addr) {
 	inet_aton(address, &dest_addr.sin_addr);
 	if (!address) printf("hihi\n");
 
+	int sequence = 1;
     struct icmphdr icmp_sender;
     memset(&icmp_sender, 0, sizeof(icmp_sender));
     icmp_sender.type = ICMP_ECHO;
-    icmp_sender.un.echo.sequence = 0;
+    icmp_sender.un.echo.sequence = sequence;
     icmp_sender.un.echo.id = getpid();
     
 	// stats purpose
@@ -69,7 +70,7 @@ int send_ping(int sockfd, char *address, struct sockaddr_in dest_addr) {
 	gettimeofday(&during, NULL);
 
     while (options.count--) {
-        icmp_sender.un.echo.sequence = htons(msg_count + 1); // convert to network number???
+        icmp_sender.un.echo.sequence = htons(sequence); // convert to network number???
         icmp_sender.checksum = 0;
         icmp_sender.checksum = calculate_checksum((uint16_t *)&icmp_sender, sizeof(icmp_sender));
         memcpy(send_buf, &icmp_sender, sizeof(icmp_sender));
@@ -81,8 +82,10 @@ int send_ping(int sockfd, char *address, struct sockaddr_in dest_addr) {
         if (bytes_sent < 0) {
             perror("sendto");
             return 1;
-        }
-		msg_count++;
+        } else {
+			msg_count++;
+		}
+	
         if (options.v) printf("Sent %zd bytes\n", bytes_sent);
 
         setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv_out, sizeof tv_out);
@@ -109,18 +112,23 @@ int send_ping(int sockfd, char *address, struct sockaddr_in dest_addr) {
 
 		msg_received_count++;
 
-		if (!options.n) {
-			printf("\t");
-			printf("%zd bytes received: ", bytes_received);
-			printf("icmp_seq=%d ", ntohs(icmp_resp->un.echo.sequence)); // inverse htons
-			printf("ttl=%d ", ip->ttl);
-			printf("time=%ld ms\n", rtt);
-		}
-
-        if (icmp_resp->un.echo.sequence != icmp_sender.un.echo.sequence) {
+        if (icmp_resp->un.echo.sequence != icmp_sender.un.echo.sequence && !options.q) {
             printf("Warning: Received sequence number does not match sent sequence number\n");
         }
 
+		if (!options.n || !options.q) {
+			printf("\t");
+			printf("%zd bytes received: ", bytes_received);
+			printf("icmp_seq=%d ", sequence); // inverse htons
+			printf("ttl=%d ", ip->ttl);
+			printf("time=%ld ms\n", rtt);
+
+			//debug
+			// printf("sender hton: %d, ntoh: %d\n", htons(sequence), ntohs(icmp_sender.un.echo.sequence));
+			// printf("response hton: %d, ntoh: %d\n", htons(sequence), ntohs(icmp_resp->un.echo.sequence));
+		}
+
+		sequence++;
         sleep(options.interval);
     }
 

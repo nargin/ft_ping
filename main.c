@@ -2,8 +2,8 @@
 
 #include "header.h"
 
-// default: count = 3, interval = 1s, verbose|quiet|numeric|preload = false
-struct flags options = {3, 1, false, false, false, false};
+// default: count = 3, preload = 0, interval = 1s, verbose|quiet|numeric = false
+struct flags options = {3, 0, 1, false, false, false};
 
 void	arguments_parser(int ac, char *av[], struct flags *flags) {
 	if (ac == 1) {
@@ -12,7 +12,7 @@ void	arguments_parser(int ac, char *av[], struct flags *flags) {
 	}
 
 	int c;
-	while ((c = getopt(ac, av, "vhc:i:qnl")) != -1) {
+	while ((c = getopt(ac, av, "vhc:i:qnl:")) != -1) {
 		switch (c) {
 			case 'v':
 				flags->v = true;
@@ -23,6 +23,9 @@ void	arguments_parser(int ac, char *av[], struct flags *flags) {
 			case 'c':
 				flags->count = atoi(optarg);
 				break;
+			case 'i':
+				flags->interval = atoi(optarg);
+				break;
 			case 'q':
 				flags->q = true;
 				break;
@@ -30,12 +33,26 @@ void	arguments_parser(int ac, char *av[], struct flags *flags) {
 				flags->n = true;
 				break;
 			case 'l':
-				flags->l = true;
+				flags->preload = atoi(optarg);
 				break;
 			default:
 				abort();
 		}
 	}
+
+	if (flags->interval < 0.0L) {
+		flags->interval = 0;
+	}
+
+	if (flags->preload < 0 || flags->preload > 3) {
+		fprintf(
+			stderr,
+			flags->preload < 3 ? "ping: invalid argument: '%d': out of range: 1 <= value <= 65536\n" : "ping: cannot set preload to value greater than 3: %d\n",
+			flags->preload
+		);
+		exit(1);
+	}
+
 }
 
 int main(int ac, char *av[]) {
