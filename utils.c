@@ -21,7 +21,7 @@ void print_flags(struct flags *flags)
     printf("  Quiet: %s\n", flags->q ? "true" : "false");
     printf("  Interval: %f\n", flags->interval);
     printf("  Numeric: %s\n", flags->n ? "true" : "false");
-    printf("  Preload: %s\n", flags->l ? "true" : "false");
+    printf("  Preload: %s\n", flags->preload ? "true" : "false");
 }
 
 void pr_iph(struct iphdr *ip)
