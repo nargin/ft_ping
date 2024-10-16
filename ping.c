@@ -129,7 +129,7 @@ int send_ping(int sockfd, char *address, struct sockaddr_in dest_addr) {
 		}
 
 		sequence++;
-		if (!preload) sleep(options.interval);
+		if (preload < 1) sleep(options.interval);
     }
 
 	gettimeofday(&elapsed, NULL);

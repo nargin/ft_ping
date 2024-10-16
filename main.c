@@ -24,7 +24,7 @@ void	arguments_parser(int ac, char *av[], struct flags *flags) {
 				flags->count = atoi(optarg);
 				break;
 			case 'i':
-				flags->interval = atoi(optarg);
+				flags->interval = atof(optarg);
 				break;
 			case 'q':
 				flags->q = true;
@@ -40,14 +40,18 @@ void	arguments_parser(int ac, char *av[], struct flags *flags) {
 		}
 	}
 
-	if (flags->interval < 0.0L) {
-		flags->interval = 0;
+	if (flags->interval < 0.002L) {
+		fprintf(stderr, "ping: cannot flood; minimal interval allowed for user is 2ms");
+		exit(1);
 	}
 
 	if (flags->preload < 0 || flags->preload > 3) {
+		char *preload3 = "ping: cannot set preload to value greater than 3: %d\n";
+		char *preloadm0 = "ping: invalid argument: '%d': out of range: 1 <= value <= 65536\n";
+
 		fprintf(
 			stderr,
-			flags->preload < 3 ? "ping: invalid argument: '%d': out of range: 1 <= value <= 65536\n" : "ping: cannot set preload to value greater than 3: %d\n",
+			flags->preload < 3 ? preloadm0 : preload3,
 			flags->preload
 		);
 		exit(1);
