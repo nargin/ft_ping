@@ -18,6 +18,7 @@ char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con) {
 
 	inet_ntop(res->ai_family, &(addr_con->sin_addr), ip, INET_ADDRSTRLEN);
 
+	freeaddrinfo(res);
 	return ip;
 }
 
@@ -52,6 +53,7 @@ int send_ping(int sockfd, char *address, struct sockaddr_in dest_addr) {
     tv_out.tv_usec = 0;
 
     dest_addr.sin_family = AF_INET;
+	dest_addr.sin_port = 0;
     // dest_addr.sin_addr.s_addr = inet_addr(address);
 	inet_aton(address, &dest_addr.sin_addr);
 	if (!address) printf("hihi\n");
