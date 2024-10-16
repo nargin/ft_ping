@@ -69,7 +69,7 @@ int send_ping(int sockfd, char *address, struct sockaddr_in dest_addr) {
 	struct timeval during, elapsed;
 	gettimeofday(&during, NULL);
 
-    for ( ;options.count; options.count--) {
+    for (int preload = options.preload, count = options.count ;count; count--, preload--) {
         icmp_sender.un.echo.sequence = htons(sequence); // convert to network number???
         icmp_sender.checksum = 0;
         icmp_sender.checksum = calculate_checksum((uint16_t *)&icmp_sender, sizeof(icmp_sender));
@@ -129,7 +129,7 @@ int send_ping(int sockfd, char *address, struct sockaddr_in dest_addr) {
 		}
 
 		sequence++;
-		if (options.preload - options.count >= 0) sleep(options.interval);
+		if (!preload) sleep(options.interval);
     }
 
 	gettimeofday(&elapsed, NULL);
@@ -141,7 +141,7 @@ int send_ping(int sockfd, char *address, struct sockaddr_in dest_addr) {
 		msg_count, msg_received_count, (100 - ((msg_received_count / msg_count) * 100)), total_time
 	);
 	if (options.preload) {
-		printf(" pipe %d", options.preload);
+		printf(" pipe %d", options.preload <= options.count ? options.preload : options.count);
 	}
 	printf("\n");
 
