@@ -11,7 +11,6 @@ void	arguments_parser(int ac, char *av[], struct flags *flags) {
 
 	int c;
 	while ((c = getopt(ac, av, "vh?c:i:qnl:")) != -1) {
-		printf("option: \"%c\"\n", c);
 		switch (c) {
 			case 'v':
 				flags->v = true;
