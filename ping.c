@@ -22,8 +22,6 @@ char *dns_lookup(char *addr_host, struct sockaddr_in *addr_con) {
 	return ip;
 }
 
-
-
 uint16_t calculate_checksum(uint16_t *addr, int len) {
 	int nleft = len;
 	int sum = 0;

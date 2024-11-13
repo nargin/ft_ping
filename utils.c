@@ -11,6 +11,7 @@ void print_help(const char *program_name)
 	printf("  -i interval   Wait interval seconds between sending each packet\n");
 	printf("  -n            Numeric output only, no name resolution\n");
 	printf("  -l            Preload (send) count packets before starting normal ping\n");
+	exit(1);
 }
 
 void print_flags(struct flags *flags)
